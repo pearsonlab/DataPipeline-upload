@@ -12,6 +12,8 @@ import threading
 import shutil
 import tempfile
 import json
+import math
+from math import floor
 
 class Progress(object):
     def __init__(self, filename):
@@ -30,7 +32,6 @@ class Progress(object):
 def local_and_s3_writer(edf, header, local, s3):
     # write locally
     localpaths = local_writer(edf, header, local, s3)
-    print("test: ",localpaths) #test
     # connect to s3
     try:
         transfer = S3Transfer(boto3.client('s3', 'us-east-1'))
@@ -56,7 +57,6 @@ def local_and_s3_writer(edf, header, local, s3):
             print("testing FILE!!!!!!!   ", fname)
         print ("File %i:" % i)
         transfer.upload_file(path, parsed_s3.netloc, fname, callback=Progress(path))
-        #test
 
         sys.stdout.write('\n')
         i += 1
@@ -84,14 +84,14 @@ def local_writer(edf, header, local, s3):
     # write data from edf to the file
     chunk_rec = 0  # number of record within chunk
     chunk_num = 0  # current chunk number
-    dayCount = 0
     all_files = []
     files = []
+    recsRemaining = header['numRecs']
     for i in range(header['numRecs']):  # iterate over records
-        if chunk_rec >= header['recsPerChunk']:
+        if chunk_rec == header['recsPerChunk']:
             chunk_rec = 0
             chunk_num += 1
-            dayCount += 1 #test
+            recsRemaining = recsRemaining - header['recsPerChunk']
         if chunk_rec == 0:  # start new files if new chunk
             for f in files:
                 f.close()
@@ -118,14 +118,25 @@ def local_writer(edf, header, local, s3):
                                               " file, it may not be the full" +
                                               " chunk size.")
                 hr, mnt, sec = header['start_time']
-                mnt += header['chunkTime'] * chunk_num
+                mnt += header['maxChunkTime'] * chunk_num
                 hr += (mnt / 60)
-                mnt = mnt % 60
-                file_head['start_time'] = (hr, mnt, sec)
+                mnt = (mnt % 60)
+
+                sec += 60*(mnt%1)
+                mnt += sec//60
+                sec = sec%60
+
+                file_head['start_time'] = (floor(hr), floor(mnt), sec)
                 file_head['sigLabel'] = header['sigLabels'][j]
                 file_head['sampsPerRecord'] = header['numSamps'][j]
                 file_head['chunk'] = chunk_num
-                file_head['dayCount'] = dayCount #test
+                file_head['recDur'] = header['recDur']
+                file_head['numRecs'] = header['numRecs']
+                file_head['recsRemaining'] = recsRemaining
+                if(recsRemaining < header['recsPerChunk']):
+                    file_head['chunkDuration'] = (recsRemaining*header['recDur'])
+                else:
+                    file_head['chunkDuration'] = (header['recsPerChunk']*header['recDur'])
                 files[j].write(json.dumps(file_head).encode('utf-8'))
                 files[j].write('\n'.encode('utf-8'))
 
@@ -142,6 +153,7 @@ def local_writer(edf, header, local, s3):
 
     for f in files:
         f.close() # close files
+    all_files += files # add incomplete chunks
 
     print ("\nLocal write complete!")
 
@@ -177,9 +189,8 @@ def head_parser(thisFile, chunk_size):
     for i in range(header['numSigs']):
         header['numSamps'].append(int(thisFile.read(8).decode("utf-8").strip()))
 
-    header['chunkTime'] = chunk_size
-    header['recsPerChunk'] = chunk_size / (header['recDur'] / 60)
-    # header['dayCount'] = 0 #test
+    header['recsPerChunk'] = floor(chunk_size / (header['recDur'] / 60)) #whole number of records per chunk
+    header['maxChunkTime'] = (header['recsPerChunk']*header['recDur'])/60
     return header
 
 if __name__ == '__main__':
@@ -193,13 +204,13 @@ if __name__ == '__main__':
     parser.add_argument('--local', help='Location to store folder of binary files (One for each chunk per signal) on the local machine.')
     parser.add_argument('--s3', help='URI formatted location to store binary folder on S3.  Only works if you have AWS ' +
                                     'credentials stored as environment variables.')
-    parser.add_argument('--chunk', help='Chunk size (in minutes) to break recordings by', default=60)
+    parser.add_argument('--chunk', help='Chunk size (in number of records) to break recordings by', default=60)
     args = parser.parse_args()
 
     edf_file = args.edfloc
     local_loc = args.local
     s3_loc = args.s3
-    chunk_size = int(args.chunk)
+    chunk_size = int(args.chunk) #to number of records
 
     # set up file writer
     if not s3_loc and not local_loc:

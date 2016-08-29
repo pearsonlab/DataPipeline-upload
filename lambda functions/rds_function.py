@@ -47,28 +47,35 @@ def lambda_handler(event, context):
         text = data.splitlines()[0]
         output = json.loads(text)
         print("Success in loading the object")
+        
+        hours = int(output["start_time"][0])
+        startMins = int(output["start_time"][1])
+        startSecs = float(output["start_time"][2])
+        totalStopSecs = startSecs + float(output["chunkDuration"]) #adding the chunkDuration(in secs) to the start time
+        # stopSecs = totalStopSecs%60
+        # stopMins = floor(startMins + (stopSecs/60))
 
-        startTime = output["start_time"][0]
-        stopTime = startTime + 1
         objectKey = str(key)
-        dayID = output["dayCount"]
-        patientID = objectKey+'-'+str(dayID)
         channelNumber = output["chunk"]
-        sig_start = dateTimeConvertor(startTime,0)
-        sig_stop = dateTimeConvertor(stopTime,0)
+        patientID = objectKey+'-'+str(channelNumber)
+
+        # converting times to dates and times
+        sig_start = dateTimeConvertor(hours, startMins, startSecs)
+        sig_stop = endDateTimeConvertor(hours, startMins, totalStopSecs)
+
         print("Successfully read the object into variables")
+        print("start secs: ", startSecs)
 
         with conn.cursor() as cur:
             cur = conn.cursor()
-            # cur.execute('insert into edfPatientInfo (PatientID, StartTime, StopTime, DayInfo, ObjectKey, ChannelNumber) values(patientID, "2000-04-12 11:26:00", "2000-04-12 12:26:00", 4, objectKey, 4)')
-            cur.execute('INSERT INTO edfPatientInfo (PatientID, StartTime, StopTime, DayInfo, ObjectKey, ChannelNumber) VALUES (%s, %s, %s, %s, %s, %s)',(patientID, sig_start, sig_stop, dayID, objectKey, channelNumber))
+            # cur.execute('insert into edfPatientInfo (PatientID, StartTime, StopTime, ObjectKey, ChannelNumber) values(patientID, "2000-04-12 11:26:00", "2000-04-12 12:26:00", objectKey, 4)')
+            cur.execute('INSERT INTO edfPatientInfo (PatientID, StartTime, StopTime, ObjectKey, ChannelNumber) VALUES (%s, %s, %s, %s, %s)',(patientID, sig_start, sig_stop, objectKey, channelNumber))
             conn.commit()
             print("Transfer completed...")
 
         print("Patient ID: ", patientID)
         print("Start time: ", sig_start)
         print("Stop time: ", sig_stop)
-        print("Day Info: ", dayID)
         print("Object key: ", objectKey)
         print("Channel number: ", channelNumber)
 
@@ -77,17 +84,20 @@ def lambda_handler(event, context):
         print('Error getting object {} from bucket {}. Make sure they exist and your bucket is in the same region as this function.'.format(key, bucket))
         raise e
 
-def dateTimeConvertor(time, day):
-    timeHours = time
-    timeMinutes = 60 * (timeHours % 1)
-    timeSeconds = 60 * (timeMinutes % 1)
+def dateTimeConvertor(Hours, Minutes, Seconds):
 
-    Hours = floor(timeHours)
-    Minutes = floor(timeMinutes % 60)
-    Seconds = floor(timeSeconds % 60)
-    timeq =  ("%d:%02d:%02d" % (Hours, Minutes, Seconds))
-    
     start_date = "2000-01-01"
     date_1 = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date = date_1 + datetime.timedelta(days = day, hours = Hours, minutes = Minutes, seconds = Seconds)
+    end_date = date_1 + datetime.timedelta(hours = Hours, minutes = Minutes, seconds = Seconds)
     return end_date
+
+def endDateTimeConvertor(Hrs, Mins, Secs):
+    Seconds = Secs%60
+    Minutes = floor(Mins + (Secs/60))
+    # Hours = floor(Hrs + (Minutes/60))
+
+    start_date = "2000-01-01"
+    date_1 = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = date_1 + datetime.timedelta(hours = Hrs, minutes = Minutes, seconds = Seconds)
+    return end_date
+
