@@ -129,14 +129,19 @@ def local_writer(edf, header, local, s3):
                 file_head['start_time'] = (floor(hr), floor(mnt), sec)
                 file_head['sigLabel'] = header['sigLabels'][j]
                 file_head['sampsPerRecord'] = header['numSamps'][j]
+                file_head['phyDimension'] = header['phyDimension'][j]
+                file_head['phyMinimum'] = header['phyMinimum'][j]
+                file_head['phyMaximum'] = header['phyMaximum'][j]
+                file_head['digMinimum'] = header['digMinimum'][j]
+                file_head['digMaximum'] = header['digMaximum'][j]
                 file_head['chunk'] = chunk_num
                 file_head['recDur'] = header['recDur']
                 file_head['numRecs'] = header['numRecs']
                 file_head['recsRemaining'] = recsRemaining
                 if(recsRemaining < header['recsPerChunk']):
-                    file_head['chunkDuration'] = (recsRemaining*header['recDur'])
+                	file_head['chunkDuration'] = (recsRemaining*header['recDur'])
                 else:
-                    file_head['chunkDuration'] = (header['recsPerChunk']*header['recDur'])
+                	file_head['chunkDuration'] = (header['recsPerChunk']*header['recDur'])
                 files[j].write(json.dumps(file_head).encode('utf-8'))
                 files[j].write('\n'.encode('utf-8'))
 
@@ -184,7 +189,28 @@ def head_parser(thisFile, chunk_size):
     header['sigLabels'] = []
     for i in range(header['numSigs']):
         header['sigLabels'].append(thisFile.read(16).decode("utf-8").strip())
-    thisFile.read(header['numSigs']*(80+8+8+8+8+8+80))
+    thisFile.read(header['numSigs']*(80))
+    
+    header['phyDimension'] = []
+    for i in range(header['numSigs']):
+        header['phyDimension'].append(thisFile.read(8).decode("utf-8").strip())
+    
+    header['phyMinimum'] = []
+    for i in range(header['numSigs']):
+        header['phyMinimum'].append(thisFile.read(8).decode("utf-8").strip())
+    header['phyMaximum'] = []
+    for i in range(header['numSigs']):
+        header['phyMaximum'].append(thisFile.read(8).decode("utf-8").strip())
+    
+    header['digMinimum'] = []
+    for i in range(header['numSigs']):
+        header['digMinimum'].append(thisFile.read(8).decode("utf-8").strip())
+    header['digMaximum'] = []
+    for i in range(header['numSigs']):
+        header['digMaximum'].append(thisFile.read(8).decode("utf-8").strip())
+
+    thisFile.read(header['numSigs']*(80))
+
     header['numSamps'] = []
     for i in range(header['numSigs']):
         header['numSamps'].append(int(thisFile.read(8).decode("utf-8").strip()))
