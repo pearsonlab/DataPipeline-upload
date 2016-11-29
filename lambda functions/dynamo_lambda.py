@@ -32,8 +32,9 @@ def lambda_handler(event, context):
     day = str(dataSet["meta"]["day"])
     fileName = str(key)
 
-    start = str(dateTimeConvertor(startT))
-    stop = str(dateTimeConvertor(stopT))
+    year = str(subject)
+    start = str(dateTimeConvertor(year, startT))
+    stop = str(dateTimeConvertor(year, stopT))
 
     print("uploading...")
     
@@ -61,8 +62,8 @@ def lambda_handler(event, context):
             }
     )
 
-def dateTimeConvertor(time):
-    start_date = "2000-01-01"
+def dateTimeConvertor(year, time):
+    start_date = year+"-01-01"
     dateTime = start_date+" "+time
     
     end_date = datetime.datetime.strptime(dateTime, "%Y-%m-%d %H:%M:%S:%f")
