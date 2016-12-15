@@ -175,7 +175,7 @@ def s3_writer(edf, header, local, s3):
     finally:
         shutil.rmtree(tmp_dir)
 
-def head_parser(thisFile, chunk_size):
+def head_parser(thisFile, chunk_size, file_size):
     header = {}
     header['filename'] = thisFile.name
     # extract info from header
@@ -215,6 +215,12 @@ def head_parser(thisFile, chunk_size):
     for i in range(header['numSigs']):
         header['numSamps'].append(int(thisFile.read(8).decode("utf-8").strip()))
 
+    # in case number of data records is unknown (-1) from the header
+    if(header['numRecs'] < 0):
+        numBytes = file_size - header['head_length'] # number of bytes for data content
+        R = sum(header['numSamps']) * 2 # length of record for all the samples
+        header['numRecs'] = floor(numBytes/R) # number of data records
+
     header['recsPerChunk'] = floor(chunk_size / (header['recDur'] / 60)) #whole number of records per chunk
     header['maxChunkTime'] = (header['recsPerChunk']*header['recDur'])/60
     return header
@@ -248,10 +254,13 @@ if __name__ == '__main__':
     else:
         writer = local_writer
 
+    # getting file_size in bytes
+    file_size = os.path.getsize(edf_file)
+
     # reads an edf file and splits the signals into a folder of binary files (one for each signal)
-    with open(edf_file, 'r+b') as thisFile: # open edf file as read-binary
+    with open(edf_file, 'rb') as thisFile: # open edf file as read-binary
         # parse header
-        header = head_parser(thisFile, chunk_size)
+        header = head_parser(thisFile, chunk_size, file_size)
 
         # write to binary files
         writer(thisFile, header, local_loc, s3_loc)
