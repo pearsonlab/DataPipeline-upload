@@ -54,14 +54,15 @@ def lambda_handler(event, context):
         totalStopSecs = startSecs + float(output["chunkDuration"]) #adding the chunkDuration(in secs) to the start time
         # stopSecs = totalStopSecs%60
         # stopMins = floor(startMins + (stopSecs/60))
+        start_date = "-".join(str(i) for i in output["start_date"])
 
         objectKey = str(key)
         channelNumber = output["chunk"]
-        patientID = objectKey+'-'+str(channelNumber)
+        patientID = str(output["start_date"][0])
 
         # converting times to dates and times
-        sig_start = dateTimeConvertor(hours, startMins, startSecs)
-        sig_stop = endDateTimeConvertor(hours, startMins, totalStopSecs)
+        sig_start = dateTimeConvertor(hours, startMins, startSecs, start_date)
+        sig_stop = endDateTimeConvertor(hours, startMins, totalStopSecs, start_date)
 
         print("Successfully read the object into variables")
         print("start secs: ", startSecs)
@@ -84,19 +85,17 @@ def lambda_handler(event, context):
         print('Error getting object {} from bucket {}. Make sure they exist and your bucket is in the same region as this function.'.format(key, bucket))
         raise e
 
-def dateTimeConvertor(Hours, Minutes, Seconds):
+def dateTimeConvertor(Hours, Minutes, Seconds, start_date):
 
-    start_date = "2000-01-01"
     date_1 = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = date_1 + datetime.timedelta(hours = Hours, minutes = Minutes, seconds = Seconds)
     return end_date
 
-def endDateTimeConvertor(Hrs, Mins, Secs):
+def endDateTimeConvertor(Hrs, Mins, Secs, start_date):
     Seconds = Secs%60
     Minutes = floor(Mins + (Secs/60))
     # Hours = floor(Hrs + (Minutes/60))
 
-    start_date = "2000-01-01"
     date_1 = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = date_1 + datetime.timedelta(hours = Hrs, minutes = Minutes, seconds = Seconds)
     return end_date
