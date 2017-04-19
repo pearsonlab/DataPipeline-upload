@@ -31,15 +31,15 @@ def lambda_handler(event, context):
     stopT = str(dataSet["meta"]["stop_time"])
     day = str(dataSet["meta"]["day"])
     fileName = str(key)
-
+    
     year = str(subject)
-    start = str(dateTimeConvertor(year, startT))
-    stop = str(dateTimeConvertor(year, stopT))
+    start = str(dateTimeConvertor(year, day, startT))
+    stop = str(dateTimeConvertor(year, day, stopT))
 
     print("uploading...")
     
     response = client.put_item(
-        TableName=TableName,
+        TableName='behavioral-data',
         Item={
             'file name': {
                 'S': fileName,
@@ -62,8 +62,8 @@ def lambda_handler(event, context):
             }
     )
 
-def dateTimeConvertor(year, time):
-    start_date = year+"-01-01"
+def dateTimeConvertor(year, day, time):
+    start_date = year+"-01-"+day
     dateTime = start_date+" "+time
     
     end_date = datetime.datetime.strptime(dateTime, "%Y-%m-%d %H:%M:%S:%f")
